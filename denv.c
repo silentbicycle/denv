@@ -35,6 +35,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -59,6 +60,7 @@ static void read_var_file(const char *dir, const char *fname) {
     struct stat s;
     char path[PATH_MAX];
     FILE *fd = NULL;
+    bool is_script = false;
     size_t sz;
     if (PATH_MAX <= snprintf(path, PATH_MAX, "%s/%s", dir, fname)) {
         errx(1, "snprintf error\n");
@@ -70,14 +72,26 @@ static void read_var_file(const char *dir, const char *fname) {
         if (unsetenv(fname) < 0) err(1, "couldn't clear: %s", fname);
         return;
     }
+
+    is_script = (s.st_mode & 0111) != 0;
+
+    if (is_script) {            /* executable -> open with popen */
+        if ((fd = popen(path, "r")) == NULL) err(1, "popen: %s", path);
+    } else {                    /* normal file */
+        if ((fd = fopen(path, "r")) == NULL) err(1, "couldn't open: %s", path);
+    }
     
-    if ((fd = fopen(path, "r")) == NULL) err(1, "couldn't open: %s", path);
     if (fgets(buf, sizeof(buf), fd) != NULL) {
         sz = strlen(buf);
         if (buf[sz - 1] == '\n') buf[sz - 1] = '\0';
         if (setenv(fname, buf, 1) < 0) err(1, "setenv: %s", fname);
     }
-    if (fclose(fd) == EOF) err(1, "%s", path);
+
+    if (is_script) {
+        if (pclose(fd) == EOF) err(1, "%s", path);
+    } else {
+        if (fclose(fd) == EOF) err(1, "%s", path);
+    }
 }
 
 static void walk(char dir[]) {
