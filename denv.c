@@ -14,25 +14,6 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/*
- * Use to exec a command with environment variables set to the contents
- * of files in a given directory.
- * For example, if you run
- *     denv confdir progname --other-args
- * where confdir is a directory containing two files, 'FOO' and 'BAR',
- * and
- *     $ cat FOO
- *     peanut butter
- *     $ cat BAR
- *     sriracha
- * then progname will be run with FOO="peanut butter" and BAR="sriracha"
- * in its environment. If a file exists but is empty, then the variable
- * will be cleared.
- *
- * This was inspired by envdir from DJB's daemontools. Say what you will
- * about daemontools, it's a weird dependency for such a handy utility.
- */ 
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
