@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2010 Scott Vokes <vokes.s@gmail.com>
+ * Copyright (c) 2010-2012 Scott Vokes <vokes.s@gmail.com>
  *  
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,7 +74,7 @@ static void read_var_file(const char *dir, const char *fname) {
                 if (buf[sz - 1] == '\n') buf[sz - 1] = '\0';
                 if (setenv(fname, buf, 1) < 0) err(1, "setenv: %s", fname);
         }
-        if (fclose(fd) == EOF) err(1, path);
+        if (fclose(fd) == EOF) err(1, "%s", path);
 }
 
 static void walk(char dir[]) {
