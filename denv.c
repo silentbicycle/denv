@@ -43,66 +43,71 @@
 #include <err.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <limits.h>
 
-#define BUFSZ 2048
+#define BUFSZ (64 * 1024)
 
 extern char **environ;
 
 static void usage() {
-        printf("Exec a command with env vars set to the contents of files in a dir.\n"
-            "Usage: denv DIR COMMAND [ARGS...]\n");
+    printf("Exec a command with env vars set to the contents of files in a dir.\n"
+        "Usage: denv DIR COMMAND [ARGS...]\n");
 }
 
 static void read_var_file(const char *dir, const char *fname) {
-        static char buf[BUFSZ];
-        struct stat s;
-        char path[BUFSZ];
-        FILE *fd;
-        size_t sz;
-        snprintf(path, BUFSZ, "%s/%s", dir, fname);
-        
-        stat(path, &s);
-        if (!S_ISREG(s.st_mode)) return; /* not regular file, skip */
-        if (s.st_size == 0) {            /* empty file -> clear var */
-                if (unsetenv(fname) < 0) err(1, "couldn't clear: %s", fname);
-                return;
-        }
-        
-        if ((fd = fopen(path, "r")) == NULL) err(1, "couldn't open: %s", path);
-        if (fgets(buf, sizeof(buf), fd) != NULL) {
-                sz = strlen(buf);
-                if (buf[sz - 1] == '\n') buf[sz - 1] = '\0';
-                if (setenv(fname, buf, 1) < 0) err(1, "setenv: %s", fname);
-        }
-        if (fclose(fd) == EOF) err(1, "%s", path);
+    static char buf[BUFSZ];
+    struct stat s;
+    char path[PATH_MAX];
+    FILE *fd = NULL;
+    size_t sz;
+    if (PATH_MAX <= snprintf(path, PATH_MAX, "%s/%s", dir, fname)) {
+        errx(1, "snprintf error\n");
+    }
+    
+    if (stat(path, &s) < 0) err(1, "%s", path);
+    if (!S_ISREG(s.st_mode)) return; /* not regular file, skip */
+    if (s.st_size == 0) {            /* empty file -> clear var */
+        if (unsetenv(fname) < 0) err(1, "couldn't clear: %s", fname);
+        return;
+    }
+    
+    if ((fd = fopen(path, "r")) == NULL) err(1, "couldn't open: %s", path);
+    if (fgets(buf, sizeof(buf), fd) != NULL) {
+        sz = strlen(buf);
+        if (buf[sz - 1] == '\n') buf[sz - 1] = '\0';
+        if (setenv(fname, buf, 1) < 0) err(1, "setenv: %s", fname);
+    }
+    if (fclose(fd) == EOF) err(1, "%s", path);
 }
 
 static void walk(char dir[]) {
-        struct stat s;
-        DIR *d;
-        struct dirent *de;
-        char path[BUFSZ];
-        
-        stat(dir, &s);
-        if (!S_ISDIR(s.st_mode)) err(1, "not a dir: %s", dir);
-        
-        d = opendir(dir);
-        while ((de = readdir(d)) != NULL) {
-                if (de->d_name[0] != '.') {
-                        snprintf(path, BUFSZ, "%s/%s", dir, de->d_name);
-                        read_var_file(dir, de->d_name);
-                }
+    struct stat s;
+    DIR *d = NULL;
+    struct dirent *de = NULL;
+    char path[PATH_MAX];
+    
+    stat(dir, &s);
+    if (!S_ISDIR(s.st_mode)) err(1, "not a dir: %s", dir);
+    
+    d = opendir(dir);
+    while ((de = readdir(d)) != NULL) {
+        if (de->d_name[0] != '.') {
+            if (PATH_MAX <= snprintf(path, PATH_MAX, "%s/%s", dir, de->d_name)) {
+                errx(1, "snprintf error\n");
+            }
+            read_var_file(dir, de->d_name);
         }
-        closedir(d);
+    }
+    closedir(d);
 }
 
 int main(int argc, char* argv[]) {
-        if (argc >= 3) {
-                walk(argv[1]);
-                if (execve(argv[2], argv + 2, environ) == -1) err(1, "bad cmd: %s", argv[2]);
-                return 0;
-        } else {
-                usage();
-                return 1;
-        }
+    if (argc >= 3) {
+        walk(argv[1]);
+        if (execve(argv[2], argv + 2, environ) == -1) err(1, "bad cmd: %s", argv[2]);
+        return 0;
+    } else {
+        usage();
+        return 1;
+    }
 }
